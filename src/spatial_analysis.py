@@ -1,21 +1,3 @@
-"""
-Canonical spatial-representation, cell-classification, and reward-proximity
-analysis functions for the pRNN reward-representation project.
-
-Consolidated from what were 3-5 near-duplicate copies of the same functions
-scattered across prnn/analysis/Hadrien_analysis/pipeline/{analysis.py,
-inputoutput.py, reward_cell_classification.py} and several exploratory
-notebooks in the original lab repo (github.com/dlevenstein/pRNN). This module
-is the single source of truth going forward.
-
-Notable fix applied during consolidation: the original
-`calculateFinalSpatialRepresentation` (pipeline/analysis.py) built its
-`position` TsdFrame over T-1 timepoints but its `rates` TsdFrame over T
-timepoints, so pynapple silently restricted to the intersection and dropped
-the last timepoint of `rates`. It's superseded here by
-`calculateInputSpatialRepresentation`, which keeps both consistent.
-"""
-
 import numpy as np
 import pandas as pd
 import torch
@@ -40,7 +22,6 @@ from prnn.analysis.TuningCurveAnalysis import (
 def calculateSpatialRepresentation(
     pRNN, env, obs, act, state, saveTrainingData=True, onsetTransient=20, activeTimeThreshold=200
 ):
-    """Hidden-layer (h) place fields, spatial-information, and HD tuning."""
     obs_pred, obs_next, h = pRNN.predict(obs, act)
     h = torch.mean(h, dim=0, keepdims=True)
 
@@ -94,10 +75,11 @@ def calculateSpatialRepresentation(
     return place_fields, SI, WAKEactivity
 
 
+#modified from calculateSpatialRepresentation
 def calculateInputSpatialRepresentation(
     pRNN, env, obs, act, state, saveTrainingData=True, onsetTransient=20, activeTimeThreshold=200
 ):
-    """Input-channel (obs[2], the grid/place-cell input fed to the network) place fields."""
+    #Input-channel (obs[2], the grid/place-cell input fed to the network) place fields.
     obs_used = obs[2]
     obs_pred, obs_next, h = pRNN.predict(obs, act)
     h = torch.mean(h, dim=0, keepdims=True)
@@ -151,11 +133,11 @@ def calculateInputSpatialRepresentation(
     }
     return place_fields, SI, WAKEactivity
 
-
+#modified from calculateSpatialRepresentation
 def calculateOutputSpatialRepresentation(
     pRNN, env, obs, act, state, saveTrainingData=True, onsetTransient=20, activeTimeThreshold=200
 ):
-    """Predicted-output-channel (the network's own obs[2] prediction) place fields."""
+    #Predicted-output-channel (the network's own obs[2] prediction) place fields.
     obs_pred, obs_next, h = pRNN.predict(obs, act)
     obs_pred_used = obs_pred[1][0]
     h = torch.mean(h, dim=0, keepdims=True)
@@ -222,7 +204,7 @@ def calculateTuningCurveReliability(env, WAKEactivity, tuning_curves):
 
 
 def calculate_metrics(env, place_fields, SI, WAKEactivity):
-    """Per-cell metrics used by groupCells. Cell order is fixed to sorted(place_fields.keys())."""
+    #Per-cell metrics used by groupCells. Cell order is fixed to sorted(place_fields.keys()).
     cell_ids = sorted(place_fields.keys())
     metrics = {
         "SI": SI.loc[cell_ids, "SI"].to_numpy(dtype=float),
@@ -250,7 +232,7 @@ def groupCells(
     place_symmetrythresh=3,
     border_symmetrythresh=3,
 ):
-    """Classify cells into untuned / HD / border / single-field / spatial+HD / complex."""
+    #Classify cells into untuned / HD / border / single-field / spatial+HD / complex.
     untuned = (metrics["EVs"] <= EV_unthresh) & (metrics["SI"] <= SI_thresh) & (metrics["HD_info"] <= HD_thresh)
     HD_cells = (metrics["EVs"] <= EV_unthresh) & (metrics["SI"] <= SI_thresh) & (metrics["HD_info"] > HD_thresh)
 
@@ -299,7 +281,7 @@ def groupCells(
 
 
 def peak_center(tc):
-    """Return (row, col) of the highest-firing bin in a 2D tuning curve, or None if all-NaN."""
+    #Return (row, col) of the highest-firing bin in a 2D tuning curve, or None if all-NaN.
     tc = np.asarray(tc, dtype=float)
     if tc.size == 0 or np.all(np.isnan(tc)):
         return None
@@ -309,7 +291,7 @@ def peak_center(tc):
 
 
 def centers_xy_from_rc(tuning_curves, idx, env, start_pos=0, use_start_offset=True):
-    """Map cell indices -> (x, y) spatial coordinates of each cell's peak firing bin."""
+    #Map cell indices -> (x, y) spatial coordinates of each cell's peak firing bin.
     idx = np.asarray(idx, dtype=int)
     if idx.size == 0:
         return np.zeros((0, 2), dtype=float)
@@ -335,7 +317,7 @@ def centers_xy_from_rc(tuning_curves, idx, env, start_pos=0, use_start_offset=Tr
 
 
 def _to_2d(a):
-    """Return a 2-D float array from array-like or dict->{array}."""
+    #Return a 2-D float array from array-like or dict->{array}.
     if a is None or (isinstance(a, float) and np.isnan(a)):
         raise ValueError("missing")
     if isinstance(a, dict):
@@ -357,7 +339,7 @@ def _normalize(a):
 
 
 def _peak_coords(a2d, threshold=0.3, neighborhood=2, min_distance=3, sigma=0.8):
-    """Local-maxima peak detection combining raw and Gaussian-smoothed arrays."""
+    #Local-maxima peak detection combining raw and Gaussian-smoothed arrays.
     raw_arr = np.array(a2d)
     smooth_arr = gaussian_filter(a2d, sigma=sigma)
     fp = generate_binary_structure(raw_arr.ndim, neighborhood)
@@ -381,7 +363,7 @@ def _peak_coords(a2d, threshold=0.3, neighborhood=2, min_distance=3, sigma=0.8):
 
 
 def identify_peaks(cells, *, threshold=0.6, neighborhood=1, normalize=True, cell_ids=None, sigma=0.8, min_distance=3):
-    """Per-cell multi-peak detection over a list/array of 2D tuning curves. Thresholds tuned empirically."""
+    #Per-cell multi-peak detection over a list/array of 2D tuning curves. Thresholds tuned empirically.
     out = {}
     for i, cell in enumerate(cells):
         try:
@@ -396,7 +378,7 @@ def identify_peaks(cells, *, threshold=0.6, neighborhood=1, normalize=True, cell
 
 
 def _grid_xy(env, H, W):
-    """Return (H,W,2) array of bin centers (x,y)."""
+    #Return (H,W,2) array of bin centers (x,y).
     e = getattr(env, "env", env)
     coords = getattr(e, "discrete_coords", None)
     if coords is not None and np.asarray(coords).shape[:2] == (H, W):
@@ -412,7 +394,7 @@ def _grid_xy(env, H, W):
 
 
 def peaks_to_xy_centers(peaks_by_cell, pf_dict, env):
-    """Convert per-cell (row, col) peak lists into (x, y) spatial coordinates."""
+    #Convert per-cell (row, col) peak lists into (x, y) spatial coordinates.
     out = {}
     if not peaks_by_cell:
         return out
@@ -445,7 +427,7 @@ def counts_within_radius(points_xy, centers_xy, radius):
 
 
 def build_circles(points_xy, reward_xy, *, radius=0.05):
-    """Fraction of cells (in points_xy) landing within `radius` of each reward location."""
+    #Fraction of cells (in points_xy) landing within `radius` of each reward location.
     counts = counts_within_radius(points_xy, reward_xy, radius)
     total = max(len(points_xy), 1)
     return {
@@ -461,11 +443,8 @@ def build_circles(points_xy, reward_xy, *, radius=0.05):
 
 
 def take_correlation_2d(a, b, env_mask=None, window_size=5):
-    """
-    Correlate two 2D place-field maps (or two 1D vectors, e.g. flattened maps).
-    For 2D inputs, returns a windowed local-correlation map (window_size x window_size
-    neighborhoods); for 1D inputs, returns a single global Pearson correlation.
-    """
+    #for 2D inputs, returns windowed local-correlation map
+    #for 1D inputs, returns a single global Pearson correlation
     a = np.asarray(a, dtype=float).copy()
     b = np.asarray(b, dtype=float).copy()
     if a.shape != b.shape:
@@ -516,22 +495,8 @@ def classify_reward_cells(activity, positions, reward_positions, radius=0.05, n_
     location is compared to the distribution of mean activities from `n_shuffles`
     circular shifts of the activity timeseries. A cell is a reward cell if its true
     mean exceeds the `percentile`-th percentile of the shuffle distribution.
-
-    Parameters
-    ----------
-    activity : (T, N) array -- neural activity timeseries.
-    positions : (T, 2) array -- agent (x, y), same coordinate space as reward_positions.
-    reward_positions : (R, 2) array -- reward location(s).
-    radius : float -- "near reward" distance threshold.
-    n_shuffles : int -- number of circular shifts for the null distribution.
-    percentile : float -- classification threshold (99 matches the paper).
-    rng : np.random.Generator or None.
-
-    Returns
-    -------
-    is_reward_cell, true_mean, shuffle_threshold : (N,) arrays.
-    near_reward_mask : (T,) bool array.
     """
+
     activity = np.asarray(activity, dtype=float)
     positions = np.asarray(positions, dtype=float)
     reward_positions = np.atleast_2d(np.asarray(reward_positions, dtype=float))
@@ -572,7 +537,7 @@ import re
 
 
 def parse_net_name(name):
-    """Extract (n_repeats, recurrence) from a net filename like '..._100_0.05-...'."""
+    #Extract (n_repeats, recurrence) from a net filename like '..._100_0.05-...'.
     m = re.search(r"_(\d+)_(0?\.\d+|\d+(?:\.\d+)?)[-_]", name)
     return {
         "n_repeats": int(m.group(1)) if m else None,
