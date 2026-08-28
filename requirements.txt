@@ -1,0 +1,11 @@
+torch
+numpy
+scipy
+pandas
+matplotlib
+pynapple
+dill
+ratinabox
+jupyter
+nbformat
+nbclient
