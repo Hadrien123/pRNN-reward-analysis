@@ -47,8 +47,7 @@ Each notebook runs the real pipeline against the two included demo networks end-
 
 This repo depends on the `prnn` package (network architectures, training
 harness, environment wrappers) from the lab's
-[`dlevenstein/pRNN`](https://github.com/dlevenstein/pRNN) repository — it
-isn't vendored here.
+[`dlevenstein/pRNN`](https://github.com/dlevenstein/pRNN) repository.
 
 ```bash
 git clone https://github.com/dlevenstein/pRNN.git
